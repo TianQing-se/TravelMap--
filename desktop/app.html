@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>旅游记录地图</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        /* ==================== 基础样式 ==================== */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            background: #f5f5f5;
+        }
+
+        /* ==================== 地图容器 ==================== */
+        #map {
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* ==================== 性能优化样式 ==================== */
+        .leaflet-tile-pane,
+        .leaflet-layer,
+        .leaflet-tile,
+        .leaflet-marker-icon,
+        .leaflet-popup,
+        .leaflet-control {
+            will-change: transform;
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+        }
+
+        .leaflet-tile {
+            pointer-events: none;
+        }
+
+        .leaflet-fade-anim .leaflet-tile,
+        .leaflet-zoom-anim .leaflet-zoom-animated {
+            transition: none !important;
+        }
+
+        .leaflet-container {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: none;
+        }
+
+        .leaflet-zoom-box {
+            box-shadow: 0 0 0 rgba(0,0,0,0);
+        }
+
+        /* ==================== UI组件样式 ==================== */
+        .title-bar {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .title-bar h2 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .title-bar p {
+            margin: 5px 0 0 0;
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* ==================== 模态框样式 ==================== */
+        .modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 1001;
+            min-width: 300px;
+            display: none;
+        }
+
+        .modal.active {
+            display: block;
+        }
+
+        .modal h3 {
+            margin-top: 0;
+        }
+
+        /* ==================== 表单样式 ==================== */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        /* ==================== 按钮样式 ==================== */
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .button-group button {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .button-group button.primary {
+            background: #4CAF50;
+            color: white;
+            border: none;
+        }
+
+        /* ==================== 照片查看器样式 ==================== */
+        .photo-viewer {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 1001;
+            min-width: 400px;
+            max-width: 80vw;
+            max-height: 80vh;
+            overflow: auto;
+            display: none;
+        }
+
+        .photo-viewer.active {
+            display: block;
+        }
+
+        .photo-viewer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .photo-viewer-header h3 {
+            margin: 0;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .photo-viewer-header .button-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .photo-viewer-header button {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        .photo-viewer-header .close-btn {
+            background: #f44336;
+            color: white;
+        }
+
+        .photo-viewer-header .refresh-btn {
+            background: #2196F3;
+            color: white;
+        }
+
+        .delete-record-button {
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 12px;
+            cursor: pointer;
+            z-index: 1002;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        /* ==================== 照片网格样式 ==================== */
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .photo-item {
+            position: relative;
+            cursor: pointer;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+
+        .photo-item:hover {
+            border-color: #2196F3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .photo-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+        }
+
+        .photo-item-delete {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: rgba(244, 67, 54, 0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            z-index: 10;
+        }
+
+        /* ==================== 上传按钮样式 ==================== */
+        .upload-button {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #2196F3;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 15px;
+        }
+
+        .upload-button input {
+            display: none;
+        }
+
+        .photo-drop-zone {
+            margin: 0 0 14px; padding: 22px 16px; border: 2px dashed #90caf9;
+            border-radius: 10px; background: #f4f9ff; text-align: center;
+            color: #334155; transition: background .15s, border-color .15s;
+        }
+        .photo-drop-zone.drag-over { background: #e3f2fd; border-color: #1976d2; }
+        .photo-drop-zone .photo-drop-hint { margin-top: 4px; color: #64748b; font-size: 12px; }
+        .photo-drop-zone .upload-button { margin: 10px 0 0; }
+
+        /* ==================== 照片预览模态框 ==================== */
+        .photo-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 1002;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .photo-modal.active {
+            display: flex;
+        }
+
+        .photo-modal img {
+            max-width: 90vw;
+            max-height: 90vh;
+            object-fit: contain;
+        }
+
+        /* ==================== 搜索框样式 ==================== */
+        .search-container {
+            margin-top: 10px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 200px;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .search-results.active {
+            display: block;
+        }
+
+        .search-result-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+
+        .search-result-item:hover {
+            background: #f5f5f5;
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-result-name {
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .search-result-address {
+            font-size: 11px;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        /* ==================== 颜色选择器样式 ==================== */
+        .color-picker {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .color-option {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .color-option:hover {
+            transform: scale(1.1);
+        }
+
+        .color-option.selected {
+            border-color: #333;
+            box-shadow: 0 0 0 2px white, 0 0 0 4px #333;
+        }
+
+        /* ==================== 自定义标记样式 ==================== */
+        .custom-marker {
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+
+        .custom-marker svg {
+            display: block;
+        }
+            .title-bar { border-radius: 12px; padding: 10px 12px; box-shadow: 0 8px 28px rgba(15,23,42,.15); width: min(370px, calc(100vw - 32px)); max-height:calc(100vh - 32px); overflow-y:auto; box-sizing:border-box; }
+        .panel-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+        .panel-window-controls { display:flex; gap:4px; flex-shrink:0; }
+        .panel-window-controls button { width:30px; height:28px; border:0; border-radius:6px; background:#f1f5f9; color:#334155; font-size:17px; line-height:1; cursor:pointer; }
+        .panel-window-controls button:hover { background:#dce8f2; }
+        .title-bar.panel-collapsed { width:auto; max-height:none; overflow:visible; }
+        .title-bar.panel-collapsed #panelContent { display:none; }
+        .title-bar h2 { color:#16324f; font-size:16px; }
+        .title-bar p { font-size:11px; }
+        .title-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+        .title-actions button { min-height:32px; padding:5px 8px !important; font-size:12px; margin:0 !important; border-radius:8px; }
+        .title-actions .map-mode { background:#f2f7fb; border:1px solid #d7e3ee; color:#29445e; }
+        .title-actions .guide-button { margin:0; }
+        .title-action-group { display:flex; flex-wrap:wrap; gap:8px; width:100%; }
+        .title-action-group + .title-action-group { margin-top:3px; padding-top:10px; border-top:1px solid #edf1f5; }
+        .guide-button { margin-left:6px; padding:6px 10px; border:1px solid #d6e2ee; border-radius:8px; background:#f7fafc; color:#29445e; cursor:pointer; }
+        .app-dialog { width:min(560px, calc(100vw - 36px)); max-height:82vh; overflow:auto; box-sizing:border-box; border:0; border-radius:18px; padding:0; color:#263746; box-shadow:0 24px 80px rgba(15,23,42,.28); }
+        .app-dialog::backdrop { background:rgba(15,23,42,.42); backdrop-filter:blur(3px); }
+        .dialog-head { padding:22px 26px 16px; background:linear-gradient(135deg,#eaf4ff,#f4fbf8); border-bottom:1px solid #e5edf4; }
+        .dialog-head h3 { margin:0; color:#16324f; font-size:21px; }
+        .dialog-head p { margin:7px 0 0; color:#627487; font-size:13px; line-height:1.6; }
+        .dialog-body { padding:18px 26px; line-height:1.7; }
+        .guide-card { margin:0 0 12px; padding:14px 16px; border:1px solid #e3ebf2; border-radius:12px; background:#fff; }
+        .guide-card h4 { margin:0 0 6px; color:#245477; }
+        .guide-card p,.guide-card ol { margin:5px 0; color:#526577; font-size:13px; }
+        .dialog-actions { display:flex; justify-content:flex-end; gap:8px; padding:0 26px 22px; }
+        .dialog-actions button { padding:8px 14px; border:1px solid #d6e2ee; border-radius:8px; background:white; cursor:pointer; }
+        .dialog-actions .primary { border-color:#2878b8; background:#2878b8; color:white; }
+        .dialog-body a { color:#1769aa; }
+        #amapKeyInput { box-sizing:border-box; margin-top:6px; padding:10px 12px; border:1px solid #cfdae4; border-radius:9px; }
+        #amapKeyInput:focus { outline:2px solid #b7dcf7; border-color:#438bc1; }
+        #amapKeyStatus { padding:9px 12px; border-radius:8px; background:#f1f7fb; color:#42627a; font-size:13px; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <!-- ==================== 标题栏 ==================== -->
+    <div class="title-bar">
+        <div class="panel-heading"><h2>🌍 旅游记录地图</h2><div class="panel-window-controls"><button id="panelToggleButton" onclick="togglePanel()" title="收起控制面板" aria-label="收起控制面板">−</button></div></div>
+        <div id="panelContent">
+        <p>点击地图添加旅行记录 | 支持本地文件夹存储 | 中国 / 全球双地图</p>
+        <div class="title-actions">
+            <div class="title-action-group">
+                <button onclick="selectDataFolder()">📁 选择数据文件夹</button>
+                <button id="exportBtn" onclick="exportData()">📤 导出数据</button>
+                <button id="importBtn" onclick="document.getElementById('importFile').click()">📥 导入数据</button>
+                <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+            </div>
+            <div class="title-action-group">
+                <button class="map-mode" onclick="switchToChina()">🇨🇳 中国地图</button>
+                <button class="map-mode" onclick="switchToGlobal()">🌍 全球地图</button>
+            </div>
+            <div class="title-action-group">
+                <button onclick="openMapSettings()" class="guide-button">⚙ 地图设置</button>
+                <button onclick="openUsageGuide()" class="guide-button">📖 使用指南</button>
+            </div>
+        </div>
+        <!-- 搜索框 -->
+        <div class="search-container">
+            <input type="text" class="search-input" id="searchInput" placeholder="搜索地点..." oninput="handleSearchInput()" onkeypress="handleSearchKeypress(event)">
+            <div class="search-results" id="searchResults"></div>
+        </div>
+        
+        <div id="folderStatus" style="margin-top: 5px; font-size: 11px; color: #666;">当前使用浏览器存储</div>
+        <div id="folderHelp" style="margin-top: 5px; font-size: 10px; color: #999; display: none;">💡 提示：将整个数据文件夹复制到其他电脑，选择该文件夹即可继续使用</div>
+        <div id="firstTimeHelp" style="margin-top: 8px; font-size: 10px; color: #666; background: #f0f8ff; padding: 8px; border-radius: 4px; border-left: 3px solid #2196F3;">
+            🔔 <strong>首次使用提示：</strong>
+            <ul style="margin: 5px 0; padding-left: 15px;">
+                <li>建议选择一个空文件夹作为数据存储位置</li>
+                <li>这样可以在不同电脑间共享数据</li>
+                <li>照片直接保存在文件夹中，便于管理</li>
+            </ul>
+        </div>
+        </div>
+    </div>
+
+    <!-- ==================== 模态框 ==================== -->
+    <div id="createModal" class="modal">
+        <h3>新建旅游记录</h3>
+        <div class="form-group">
+            <label>地点名称：</label>
+            <input type="text" id="recordName" placeholder="例如：北京故宫">
+        </div>
+        <div class="form-group">
+            <label>标记颜色：</label>
+            <div class="color-picker">
+                <div class="color-option" data-color="#FF0000" style="background: #FF0000;" onclick="selectColor('#FF0000')" title="红色"></div>
+                <div class="color-option" data-color="#FF4500" style="background: #FF4500;" onclick="selectColor('#FF4500')" title="橙红色"></div>
+                <div class="color-option" data-color="#FF8C00" style="background: #FF8C00;" onclick="selectColor('#FF8C00')" title="深橙色"></div>
+                <div class="color-option" data-color="#FFA500" style="background: #FFA500;" onclick="selectColor('#FFA500')" title="橙色"></div>
+                <div class="color-option" data-color="#FFD700" style="background: #FFD700;" onclick="selectColor('#FFD700')" title="金色"></div>
+                <div class="color-option" data-color="#FFFF00" style="background: #FFFF00;" onclick="selectColor('#FFFF00')" title="黄色"></div>
+                <div class="color-option" data-color="#ADFF2F" style="background: #ADFF2F;" onclick="selectColor('#ADFF2F')" title="黄绿色"></div>
+                <div class="color-option" data-color="#00FF00" style="background: #00FF00;" onclick="selectColor('#00FF00')" title="绿色"></div>
+                <div class="color-option" data-color="#008000" style="background: #008000;" onclick="selectColor('#008000')" title="深绿色"></div>
+                <div class="color-option" data-color="#00FFFF" style="background: #00FFFF;" onclick="selectColor('#00FFFF')" title="青色"></div>
+                <div class="color-option" data-color="#00CED1" style="background: #00CED1;" onclick="selectColor('#00CED1')" title="深青色"></div>
+                <div class="color-option" data-color="#008B8B" style="background: #008B8B;" onclick="selectColor('#008B8B')" title="青绿色"></div>
+                <div class="color-option" data-color="#0000FF" style="background: #0000FF;" onclick="selectColor('#0000FF')" title="蓝色"></div>
+                <div class="color-option" data-color="#1E90FF" style="background: #1E90FF;" onclick="selectColor('#1E90FF')" title="道奇蓝"></div>
+                <div class="color-option" data-color="#4169E1" style="background: #4169E1;" onclick="selectColor('#4169E1')" title="皇家蓝"></div>
+                <div class="color-option" data-color="#8A2BE2" style="background: #8A2BE2;" onclick="selectColor('#8A2BE2')" title="蓝紫色"></div>
+                <div class="color-option" data-color="#9400D3" style="background: #9400D3;" onclick="selectColor('#9400D3')" title="深紫色"></div>
+                <div class="color-option" data-color="#800080" style="background: #800080;" onclick="selectColor('#800080')" title="紫色"></div>
+                <div class="color-option" data-color="#FF00FF" style="background: #FF00FF;" onclick="selectColor('#FF00FF')" title="洋红色"></div>
+                <div class="color-option" data-color="#FF1493" style="background: #FF1493;" onclick="selectColor('#FF1493')" title="深粉色"></div>
+                <div class="color-option" data-color="#C71585" style="background: #C71585;" onclick="selectColor('#C71585')" title="紫红色"></div>
+            </div>
+            <input type="hidden" id="selectedColor" value="#FF0000">
+        </div>
+        <div class="button-group">
+            <button onclick="closeCreateModal()">取消</button>
+            <button class="primary" onclick="createRecord()">创建</button>
+        </div>
+    </div>
+
+    <div id="noteEditor" class="modal" style="min-width: 500px; max-width: 800px;">
+        <h3 id="noteEditorTitle">笔记编辑器</h3>
+        <div class="form-group">
+            <textarea id="noteContent" style="width: 100%; min-height: 300px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: 'Microsoft YaHei', Arial, sans-serif; font-size: 14px; line-height: 1.6; resize: vertical;" placeholder="在这里记录你的旅游经历..."></textarea>
+        </div>
+        <div class="button-group">
+            <button onclick="closeNoteEditor()">取消</button>
+            <button class="primary" onclick="saveNote()">保存笔记</button>
+        </div>
+    </div>
+
+    <div id="colorEditor" class="modal" style="min-width: 400px; max-width: 600px;">
+        <h3 id="colorEditorTitle">修改标记颜色</h3>
+        <div class="form-group">
+            <label>选择新颜色：</label>
+            <div class="color-picker">
+                <div class="color-option" data-color="#FF0000" style="background: #FF0000;" onclick="selectEditColor('#FF0000')" title="红色"></div>
+                <div class="color-option" data-color="#FF4500" style="background: #FF4500;" onclick="selectEditColor('#FF4500')" title="橙红色"></div>
+                <div class="color-option" data-color="#FF8C00" style="background: #FF8C00;" onclick="selectEditColor('#FF8C00')" title="深橙色"></div>
+                <div class="color-option" data-color="#FFA500" style="background: #FFA500;" onclick="selectEditColor('#FFA500')" title="橙色"></div>
+                <div class="color-option" data-color="#FFD700" style="background: #FFD700;" onclick="selectEditColor('#FFD700')" title="金色"></div>
+                <div class="color-option" data-color="#FFFF00" style="background: #FFFF00;" onclick="selectEditColor('#FFFF00')" title="黄色"></div>
+                <div class="color-option" data-color="#ADFF2F" style="background: #ADFF2F;" onclick="selectEditColor('#ADFF2F')" title="黄绿色"></div>
+                <div class="color-option" data-color="#00FF00" style="background: #00FF00;" onclick="selectEditColor('#00FF00')" title="绿色"></div>
+                <div class="color-option" data-color="#008000" style="background: #008000;" onclick="selectEditColor('#008000')" title="深绿色"></div>
+                <div class="color-option" data-color="#00FFFF" style="background: #00FFFF;" onclick="selectEditColor('#00FFFF')" title="青色"></div>
+                <div class="color-option" data-color="#00CED1" style="background: #00CED1;" onclick="selectEditColor('#00CED1')" title="深青色"></div>
+                <div class="color-option" data-color="#008B8B" style="background: #008B8B;" onclick="selectEditColor('#008B8B')" title="青绿色"></div>
+                <div class="color-option" data-color="#0000FF" style="background: #0000FF;" onclick="selectEditColor('#0000FF')" title="蓝色"></div>
+                <div class="color-option" data-color="#1E90FF" style="background: #1E90FF;" onclick="selectEditColor('#1E90FF')" title="道奇蓝"></div>
+                <div class="color-option" data-color="#4169E1" style="background: #4169E1;" onclick="selectEditColor('#4169E1')" title="皇家蓝"></div>
+                <div class="color-option" data-color="#8A2BE2" style="background: #8A2BE2;" onclick="selectEditColor('#8A2BE2')" title="蓝紫色"></div>
+                <div class="color-option" data-color="#9400D3" style="background: #9400D3;" onclick="selectEditColor('#9400D3')" title="深紫色"></div>
+                <div class="color-option" data-color="#800080" style="background: #800080;" onclick="selectEditColor('#800080')" title="紫色"></div>
+                <div class="color-option" data-color="#FF00FF" style="background: #FF00FF;" onclick="selectEditColor('#FF00FF')" title="洋红色"></div>
+                <div class="color-option" data-color="#FF1493" style="background: #FF1493;" onclick="selectEditColor('#FF1493')" title="深粉色"></div>
+                <div class="color-option" data-color="#C71585" style="background: #C71585;" onclick="selectEditColor('#C71585')" title="紫红色"></div>
+            </div>
+            <input type="hidden" id="selectedEditColor" value="#FF0000">
+        </div>
+        <div class="button-group">
+            <button onclick="closeColorEditor()">取消</button>
+            <button class="primary" onclick="saveColor()">保存颜色</button>
+        </div>
+    </div>
+
+    <div id="photoViewer" class="photo-viewer">
+        <div class="photo-viewer-header">
+            <h3 id="photoViewerTitle">地点名称</h3>
+            <div class="button-group">
+                <button onclick="openColorEditor()" style="padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; background: #9C27B0; color: white; margin-right: 5px;">🎨 修改颜色</button>
+                <button onclick="openNoteEditor()" style="padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; background: #FF9800; color: white; margin-right: 5px;">📝 编辑笔记</button>
+                <button class="delete-record-button" onclick="deleteRecord()">🗑️ 删除记录</button>
+                <button id="refreshBtn" class="refresh-btn" onclick="refreshPhotos()" style="display: none;">🔄 刷新照片</button>
+                <button class="close-btn" onclick="closePhotoViewer()">关闭</button>
+            </div>
+        </div>
+        
+        <div id="photoDropZone" class="photo-drop-zone" tabindex="0" role="button" aria-label="拖动照片到此处，或点击选择照片">
+            <div>将图片拖到这里</div><div class="photo-drop-hint">也可以</div>
+            <label class="upload-button">选择图片<input id="photoFileInput" type="file" accept="image/*" multiple onchange="handlePhotoUpload(event)"></label>
+        </div>
+        <div id="photoGrid" class="photo-grid"></div>
+    </div>
+
+    <div id="photoModal" class="photo-modal" onclick="closePhotoModal()">
+        <img id="photoModalImage" src="" alt="预览">
+    </div>
+
+    <dialog id="mapSettings" class="app-dialog">
+        <div class="dialog-head"><h3>地图搜索设置</h3><p>为地点搜索配置自己的高德 Web 服务 Key。地图浏览无需填写此 Key。</p></div>
+        <div class="dialog-body">
+            <div class="guide-card"><h4>申请步骤</h4><ol><li>打开<a href="https://console.amap.com/" target="_blank" rel="noopener noreferrer">高德开放平台控制台</a>并登录。</li><li>进入应用管理，创建应用并添加「Web 服务」类型 Key。</li><li>复制 Key 到下方保存。无需填写 JS API 安全密钥。</li></ol><a href="https://lbs.amap.com/api/webservice/create-project-and-key" target="_blank" rel="noopener noreferrer">查看高德官方申请指南 ↗</a></div>
+            <p id="amapKeyStatus" role="status"></p><label>Web 服务 Key<br><input id="amapKeyInput" type="password" autocomplete="off" style="width:100%" placeholder="粘贴 32 位 Key"></label>
+            <p style="font-size:12px;color:#718096">Key 保存在这台电脑的应用存储中，搜索时发送给高德。它不是加密保险箱，请勿分享包含个人数据的电脑账户。</p>
+        </div><div class="dialog-actions"><button onclick="clearMapKey()">清除 Key</button><button onclick="document.getElementById('mapSettings').close()">关闭</button><button class="primary" onclick="saveMapKey()">保存设置</button></div>
+    </dialog>
+    <dialog id="usageGuide" class="app-dialog">
+        <div class="dialog-head"><h3>TravelMap 使用指南</h3><p>快速了解地图、照片与旅行数据的保存方式。</p></div>
+        <div class="dialog-body">
+            <section class="guide-card"><h4>📁 选择数据文件夹（推荐）</h4><p>点击主界面的「选择数据文件夹」，选一个专门的空文件夹。之后新建的旅行记录、笔记和照片会保存到这里，方便备份或迁移电脑。软件会尝试记住此位置，下次启动时可能需要重新授权。</p><p>想备份时，先关闭软件，再复制整个数据文件夹。</p></section>
+            <section class="guide-card"><h4>💾 不选择文件夹时</h4><p>记录和照片保存在当前 Windows 用户的应用本地存储中，不在安装目录，也不会自动同步到云端。卸载或清理应用数据可能造成数据丢失，建议定期使用「导出数据」备份；浏览器存储模式下，照片数据也会包含在导出的记录中。</p></section>
+            <section class="guide-card"><h4>🔑 地点搜索 Key</h4><p>点击「地图设置」，按步骤申请高德「Web 服务」Key 并保存。没有 Key 时仍可浏览地图、添加记录；搜索地点需要 Key。之后可在此替换或清除。</p></section>
+            <section class="guide-card"><h4>🗺️ 中国地图与全球地图</h4><p>中国模式使用高德地图，全球模式使用 OpenStreetMap。地图均需联网；全球底图无需申请 Key。高德搜索 Key 仅用于地点搜索。</p></section>
+        </div><div class="dialog-actions"><button class="primary" onclick="document.getElementById('usageGuide').close()">知道了</button></div>
+    </dialog>
+    <script>
+        function togglePanel() {
+            const panel = document.querySelector(".title-bar");
+            const collapsed = panel.classList.toggle("panel-collapsed");
+            const button = document.getElementById("panelToggleButton");
+            button.textContent = collapsed ? "+" : "−";
+            button.title = collapsed ? "展开控制面板" : "收起控制面板";
+            button.setAttribute("aria-label", button.title);
+        }
+        function openUsageGuide() { document.getElementById("usageGuide").showModal(); }
+        function openMapSettings() {
+            const saved = localStorage.getItem("travelmap.amapKey") || "";
+            document.getElementById("amapKeyInput").value = "";
+            document.getElementById("amapKeyStatus").textContent = saved ? "已配置 Key（末四位 " + saved.slice(-4) + "）。输入新 Key 后保存即可更换。" : "尚未配置 Key。";
+            const dialog = document.getElementById("mapSettings");
+            if (!dialog.open) dialog.showModal();
+        }
+        function clearMapKey() {
+            localStorage.removeItem("travelmap.amapKey");
+            openMapSettings();
+        }
+        window.addEventListener("DOMContentLoaded", () => {
+            if (!localStorage.getItem("travelmap.amapKey")) openMapSettings();
+        });
+        function saveMapKey() {
+            const key = document.getElementById("amapKeyInput").value.trim();
+            if (!/^[a-f0-9]{32}$/i.test(key)) { alert("请填写有效的32位高德 Web 服务 Key"); return; }
+            localStorage.setItem("travelmap.amapKey", key);
+            document.getElementById("amapKeyInput").value = "";
+            document.getElementById("mapSettings").close();
+        }
+    </script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // ==================== 地图配置 ====================
+        const MAP_CONFIG = {
+            center: [35.8617, 104.1954],
+            zoom: 4,
+            maxZoom: 19,
+            minZoom: 2,
+            performance: {
+                preferCanvas: true,
+                updateWhenIdle: true,
+                updateWhenZooming: false,
+                keepBuffer: 0,
+                bounceAtZoomLimits: false,
+                zoomSnap: 0.25,
+                zoomDelta: 0.25,
+                wheelDebounceTime: 100,
+                wheelPxPerZoomLevel: 60,
+                renderer: L.canvas(),
+                fadeAnimation: false,
+                markerZoomAnimation: false,
+                transform3DLimit: 10000,
+                inertia: true,
+                worldCopyJump: false,
+                maxBoundsViscosity: 1.0,
+                keyboard: true,
+                doubleClickZoom: true,
+                touchZoom: true,
+                scrollWheelZoom: true,
+                boxZoom: true,
+                tap: true
+            }
+        };
+
+        const LAYER_CONFIG = {
+            global: {
+                url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap 贡献者</a>',
+                maxZoom: 16,
+                minZoom: 2,
+                tileSize: 256,
+                zoomOffset: 0,
+                detectRetina: false,
+                crossOrigin: true,
+                reuseTiles: true,
+                unloadInvisibleTiles: true,
+                updateWhenIdle: true,
+                updateInterval: 300,
+                noWrap: true,
+                bounds: [[-90, -180], [90, 180]],
+                className: 'leaflet-tile-pane-optimized',
+                opacity: 1,
+                zIndex: 1,
+                minNativeZoom: 2,
+                maxNativeZoom: 16
+            },
+            china: {
+                url: 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
+                subdomains: ['1', '2', '3', '4'],
+                attribution: '© 高德地图',
+                maxZoom: 19,
+                minZoom: 2,
+                tileSize: 256,
+                maxNativeZoom: 19
+            }
+        };
+
+        // ==================== 数据库配置 ====================
+        const DB_CONFIG = {
+            name: 'TravelMapDB',
+            version: 1,
+            storeName: 'folderHandles'
+        };
+
+        // ==================== 全局状态 ====================
+        const state = {
+            map: null,
+            globalLayer: null,
+            chinaLayer: null,
+            tilesLoaded: false,
+            travelRecords: [],
+            markers: [],
+            currentModalPosition: null,
+            currentRecord: null,
+            dataDirectoryHandle: null,
+            useLocalStorage: true,
+            searchMarker: null
+        };
+
+        // ==================== 地图初始化 ====================
+        function initMap() {
+            state.map = L.map('map', {
+                center: MAP_CONFIG.center,
+                zoom: MAP_CONFIG.zoom,
+                maxZoom: MAP_CONFIG.maxZoom,
+                minZoom: MAP_CONFIG.minZoom,
+                ...MAP_CONFIG.performance
+            });
+
+            state.globalLayer = L.tileLayer(LAYER_CONFIG.global.url, LAYER_CONFIG.global);
+            state.chinaLayer = L.tileLayer(LAYER_CONFIG.china.url, LAYER_CONFIG.china);
+            state.chinaLayer.addTo(state.map);
+            setupMapEvents();
+            setupMapControls();
+        }
+
+        function setupMapEvents() {
+            state.map.on('tileload', () => {
+                if (!state.tilesLoaded) {
+                    state.tilesLoaded = true;
+                    console.log('地图瓦片加载成功');
+                }
+            });
+
+            state.map.on('zoomend', () => {
+                console.log('缩放完成，瓦片已更新');
+                state.tilesLoaded = false;
+            });
+
+            state.map.on('click', (e) => {
+                state.currentModalPosition = e.latlng;
+                document.getElementById('createModal').classList.add('active');
+                document.getElementById('recordName').value = '';
+                // 初始化颜色选择器
+                document.getElementById('selectedColor').value = '#FF0000';
+                document.querySelectorAll('#createModal .color-option').forEach(opt => opt.classList.remove('selected'));
+                const defaultOption = document.querySelector('#createModal .color-option[data-color="#FF0000"]');
+                if (defaultOption) {
+                    defaultOption.classList.add('selected');
+                }
+            });
+        }
+
+        function setupMapControls() {
+            // 不需要设置默认图标，因为我们使用自定义图标
+        }
+
+
+        function switchToGlobal() {
+            if (state.map.hasLayer(state.chinaLayer)) state.map.removeLayer(state.chinaLayer);
+            state.globalLayer.addTo(state.map);
+            state.tilesLoaded = false;
+        }
+
+        function switchToChina() {
+            if (state.map.hasLayer(state.globalLayer)) state.map.removeLayer(state.globalLayer);
+            state.chinaLayer.addTo(state.map);
+            state.tilesLoaded = false;
+        }
+
+        // ==================== IndexedDB 操作 ====================
+        async function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_CONFIG.name, DB_CONFIG.version);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(DB_CONFIG.storeName)) {
+                        db.createObjectStore(DB_CONFIG.storeName);
+                    }
+                };
+            });
+        }
+
+        async function saveFolderHandle(handle) {
+            try {
+                const db = await initDB();
+                const tx = db.transaction(DB_CONFIG.storeName, 'readwrite');
+                const store = tx.objectStore(DB_CONFIG.storeName);
+                store.put(handle, 'lastFolder');
+                await new Promise((resolve, reject) => {
+                    tx.oncomplete = resolve;
+                    tx.onerror = () => reject(tx.error);
+                });
+                console.log('文件夹句柄已保存');
+            } catch (error) {
+                console.error('保存文件夹句柄失败:', error);
+            }
+        }
+
+        async function getFolderHandle() {
+            try {
+                const db = await initDB();
+                const tx = db.transaction(DB_CONFIG.storeName, 'readonly');
+                const store = tx.objectStore(DB_CONFIG.storeName);
+                const request = store.get('lastFolder');
+                return new Promise((resolve, reject) => {
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            } catch (error) {
+                console.error('获取文件夹句柄失败:', error);
+                return null;
+            }
+        }
+
+        async function requestFolderPermission(handle) {
+            try {
+                const options = { mode: 'readwrite' };
+                if ((await handle.queryPermission(options)) === 'granted') {
+                    return true;
+                }
+                if ((await handle.requestPermission(options)) === 'granted') {
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.error('请求文件夹权限失败:', error);
+                return false;
+            }
+        }
+
+        // ==================== 文件夹操作 ====================
+        async function selectDataFolder() {
+            try {
+                if (!window.showDirectoryPicker) {
+                    alert('您的浏览器不支持File System Access API。\n\n请使用以下浏览器之一：\n- Chrome 86+\n- Edge 86+\n\nFirefox暂不支持此功能，您可以使用浏览器存储模式。');
+                    return;
+                }
+
+                showLoadingMessage('📁 正在请求文件夹访问权限...', '请在浏览器弹出的对话框中点击"查看文件"或"允许"');
+                state.dataDirectoryHandle = await window.showDirectoryPicker();
+                hideLoadingMessage();
+
+                state.useLocalStorage = false;
+                updateFolderUI(state.dataDirectoryHandle.name);
+                saveLastFolder(state.dataDirectoryHandle.name);
+                await saveFolderHandle(state.dataDirectoryHandle);
+                await loadRecordsFromFolder();
+                alert('✅ 文件夹选择成功！\n\n数据将保存到本地文件夹，您可以在文件系统中直接管理照片和记录。\n下次打开时会自动加载此文件夹。');
+            } catch (error) {
+                hideLoadingMessage();
+                if (error.name !== 'AbortError') {
+                    console.error('选择文件夹失败:', error);
+                    handleFolderError(error);
+                }
+            }
+        }
+
+        function showLoadingMessage(title, subtitle) {
+            const loadingMsg = document.createElement('div');
+            loadingMsg.id = 'folder-loading-msg';
+            loadingMsg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 20px; border-radius: 10px; z-index: 2000; text-align: center; min-width: 300px;';
+            loadingMsg.innerHTML = `<div style="font-size: 16px; margin-bottom: 10px;">${title}</div><div style="font-size: 12px; color: #aaa;">${subtitle}</div>`;
+            document.body.appendChild(loadingMsg);
+        }
+
+        function hideLoadingMessage() {
+            const loadingElement = document.getElementById('folder-loading-msg');
+            if (loadingElement) document.body.removeChild(loadingElement);
+        }
+
+        function updateFolderUI(folderName) {
+            document.getElementById('folderStatus').textContent = `当前使用文件夹: ${folderName}`;
+            document.getElementById('folderHelp').style.display = 'block';
+            document.getElementById('firstTimeHelp').style.display = 'none';
+            document.getElementById('exportBtn').style.display = 'none';
+            document.getElementById('importBtn').style.display = 'none';
+        }
+
+        function handleFolderError(error) {
+            if (error.name === 'NotAllowedError') {
+                alert('❌ 文件夹访问被拒绝\n\n请在浏览器弹出的对话框中点击"查看文件"或"允许"以授予文件夹访问权限。\n\n如果您误点了"阻止"，请在浏览器设置中清除网站权限后重试。');
+            } else {
+                alert('❌ 选择文件夹失败：' + error.message + '\n\n请确保：\n1. 使用Chrome 86+或Edge 86+浏览器\n2. 浏览器没有阻止弹窗\n3. 您有足够的文件系统访问权限');
+            }
+        }
+
+        async function loadRecordsFromFolder() {
+            try {
+                state.travelRecords = [];
+                state.markers.forEach(item => state.map.removeLayer(item.marker));
+                state.markers = [];
+
+                for await (const entry of state.dataDirectoryHandle.values()) {
+                    if (entry.kind === 'directory') {
+                        const record = await loadRecordFromFolder(entry);
+                        state.travelRecords.push(record);
+                        addMarkerToMap(record);
+                    }
+                }
+
+                if (state.travelRecords.length === 0) {
+                    alert('文件夹为空，没有找到旅游记录');
+                }
+            } catch (error) {
+                console.error('从文件夹加载记录失败:', error);
+                alert('加载记录失败: ' + error.message);
+            }
+        }
+
+        async function loadRecordFromFolder(entry) {
+            const infoFile = await entry.getFileHandle('info.json');
+            const infoContent = await (await infoFile.getFile()).text();
+            const record = JSON.parse(infoContent);
+            record.id = entry.name;
+            record.folderHandle = entry;
+
+            // 为没有颜色的旧记录添加默认颜色
+            if (!record.color) {
+                record.color = '#FF0000';
+            }
+
+            try {
+                const photosHandle = await entry.getDirectoryHandle('photos');
+                const photoFiles = [];
+                for await (const photoEntry of photosHandle.values()) {
+                    if (photoEntry.kind === 'file') {
+                        photoFiles.push(photoEntry.name);
+                    }
+                }
+                record.photos = photoFiles;
+            } catch (error) {
+                record.photos = [];
+            }
+
+            return record;
+        }
+
+        async function autoLoadLastFolder() {
+            try {
+                const savedHandle = await getFolderHandle();
+                if (savedHandle) {
+                    console.log('检测到上次使用的数据文件夹句柄');
+                    const hasPermission = await requestFolderPermission(savedHandle);
+                    if (hasPermission) {
+                        state.dataDirectoryHandle = savedHandle;
+                        state.useLocalStorage = false;
+                        updateFolderUI(state.dataDirectoryHandle.name);
+                        await loadRecordsFromFolder();
+                        console.log('✅ 自动加载上次数据文件夹成功');
+                    } else {
+                        showLastFolderHint();
+                    }
+                }
+            } catch (error) {
+                console.error('自动加载文件夹失败:', error);
+            }
+        }
+
+        function showLastFolderHint() {
+            const lastFolder = getLastFolder();
+            if (lastFolder) {
+                document.getElementById('folderStatus').textContent = `上次使用文件夹: ${lastFolder}`;
+                document.getElementById('folderHelp').style.display = 'block';
+                document.getElementById('folderHelp').textContent = '💡 检测到上次使用的数据文件夹，点击"📁 选择数据文件夹"重新选择即可继续使用';
+            }
+        }
+
+        function saveLastFolder(folderName) {
+            localStorage.setItem('lastDataFolder', folderName);
+        }
+
+        function getLastFolder() {
+            return localStorage.getItem('lastDataFolder');
+        }
+
+        // ==================== 记录管理 ====================
+        function loadRecords() {
+            if (state.useLocalStorage) {
+                state.travelRecords.forEach(record => {
+                    // 为没有颜色的旧记录添加默认颜色
+                    if (!record.color) {
+                        record.color = '#FF0000';
+                    }
+                    addMarkerToMap(record);
+                });
+            }
+        }
+
+        function addMarkerToMap(record) {
+            // 使用自定义颜色创建图针标记
+            const color = record.color || '#FF0000'; // 默认红色
+            
+            const customIcon = L.divIcon({
+                className: 'custom-marker',
+                html: `<svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 8.7 12.5 28.5 12.5 28.5S25 21.2 25 12.5C25 5.6 19.4 0 12.5 0z" fill="${color}" stroke="white" stroke-width="2"/>
+                    <circle cx="12.5" cy="12.5" r="5" fill="white"/>
+                </svg>`,
+                iconSize: [25, 41],
+                iconAnchor: [12, 41]
+            });
+
+            const marker = L.marker([record.lat, record.lng], { icon: customIcon })
+                .addTo(state.map)
+                .bindPopup(`<b>${record.name}</b>`);
+            
+            marker.on('click', () => showPhotoViewer(record));
+            state.markers.push({ marker, record });
+        }
+
+        function closeCreateModal() {
+            document.getElementById('createModal').classList.remove('active');
+            state.currentModalPosition = null;
+            // 重置颜色选择
+            document.getElementById('selectedColor').value = '#FF0000';
+            document.querySelectorAll('#createModal .color-option').forEach(opt => opt.classList.remove('selected'));
+            const defaultOption = document.querySelector('#createModal .color-option[data-color="#FF0000"]');
+            if (defaultOption) {
+                defaultOption.classList.add('selected');
+            }
+        }
+
+        function selectColor(color) {
+            document.getElementById('selectedColor').value = color;
+            document.querySelectorAll('#createModal .color-option').forEach(opt => opt.classList.remove('selected'));
+            const selectedOption = document.querySelector(`#createModal .color-option[data-color="${color}"]`);
+            if (selectedOption) {
+                selectedOption.classList.add('selected');
+            }
+        }
+
+        function selectEditColor(color) {
+            document.getElementById('selectedEditColor').value = color;
+            document.querySelectorAll('#colorEditor .color-option').forEach(opt => opt.classList.remove('selected'));
+            const selectedOption = document.querySelector(`#colorEditor .color-option[data-color="${color}"]`);
+            if (selectedOption) {
+                selectedOption.classList.add('selected');
+            }
+        }
+
+        async function createRecord() {
+            const name = document.getElementById('recordName').value.trim();
+            if (!name) {
+                alert('请输入地点名称');
+                return;
+            }
+
+            if (state.useLocalStorage) {
+                createLocalStorageRecord(name);
+            } else {
+                await createFolderRecord(name);
+            }
+        }
+
+        function createLocalStorageRecord(name) {
+            const color = document.getElementById('selectedColor').value;
+            const record = {
+                id: Date.now().toString(),
+                name,
+                lat: state.currentModalPosition.lat,
+                lng: state.currentModalPosition.lng,
+                color: color,
+                photos: [],
+                createdAt: new Date().toISOString()
+            };
+
+            state.travelRecords.push(record);
+            localStorage.setItem('travelRecords', JSON.stringify(state.travelRecords));
+            addMarkerToMap(record);
+            closeCreateModal();
+            document.getElementById('firstTimeHelp').style.display = 'none';
+        }
+
+        async function createFolderRecord(name) {
+            try {
+                const color = document.getElementById('selectedColor').value;
+                // 先尝试使用纯名称，如果冲突则添加时间戳
+                let folderName = name;
+                try {
+                    const folderHandle = await state.dataDirectoryHandle.getDirectoryHandle(folderName, { create: true });
+                    const record = {
+                        id: folderName,
+                        name,
+                        lat: state.currentModalPosition.lat,
+                        lng: state.currentModalPosition.lng,
+                        color: color,
+                        photos: [],
+                        createdAt: new Date().toISOString(),
+                        folderHandle: folderHandle
+                    };
+
+                    await saveRecordToFolder(folderHandle, record);
+                    state.travelRecords.push(record);
+                    addMarkerToMap(record);
+                    closeCreateModal();
+                } catch (conflictError) {
+                    // 如果名称冲突，添加时间戳
+                    folderName = `${name}_${Date.now()}`;
+                    const folderHandle = await state.dataDirectoryHandle.getDirectoryHandle(folderName, { create: true });
+                    const record = {
+                        id: folderName,
+                        name,
+                        lat: state.currentModalPosition.lat,
+                        lng: state.currentModalPosition.lng,
+                        color: color,
+                        photos: [],
+                        createdAt: new Date().toISOString(),
+                        folderHandle: folderHandle
+                    };
+
+                    await saveRecordToFolder(folderHandle, record);
+                    state.travelRecords.push(record);
+                    addMarkerToMap(record);
+                    closeCreateModal();
+                }
+            } catch (error) {
+                console.error('创建记录失败:', error);
+                alert('创建记录失败: ' + error.message);
+            }
+        }
+
+        async function saveRecordToFolder(folderHandle, record) {
+            const infoHandle = await folderHandle.getFileHandle('info.json', { create: true });
+            const writable = await infoHandle.createWritable();
+            await writable.write(JSON.stringify(record, null, 2));
+            await writable.close();
+
+            await folderHandle.getDirectoryHandle('photos', { create: true });
+
+            const noteHandle = await folderHandle.getFileHandle('note.txt', { create: true });
+            const noteWritable = await noteHandle.createWritable();
+            await noteWritable.write('');
+            await noteWritable.close();
+        }
+
+        async function deleteRecord() {
+            if (!state.currentRecord) return;
+            
+            if (confirm(`确定要删除"${state.currentRecord.name}"这个记录吗？所有照片也将被删除。`)) {
+                removeMarkerFromMap(state.currentRecord.id);
+                
+                if (state.useLocalStorage) {
+                    deleteLocalStorageRecord(state.currentRecord.id);
+                } else {
+                    await deleteFolderRecord(state.currentRecord.id);
+                }
+                
+                closePhotoViewer();
+            }
+        }
+
+        function removeMarkerFromMap(recordId) {
+            const markerIndex = state.markers.findIndex(m => m.record.id === recordId);
+            if (markerIndex !== -1) {
+                state.map.removeLayer(state.markers[markerIndex].marker);
+                state.markers.splice(markerIndex, 1);
+            }
+        }
+
+        function deleteLocalStorageRecord(recordId) {
+            state.travelRecords = state.travelRecords.filter(r => r.id !== recordId);
+            localStorage.setItem('travelRecords', JSON.stringify(state.travelRecords));
+        }
+
+        async function deleteFolderRecord(recordId) {
+            try {
+                await state.dataDirectoryHandle.removeEntry(recordId, { recursive: true });
+                state.travelRecords = state.travelRecords.filter(r => r.id !== recordId);
+            } catch (error) {
+                console.error('删除记录失败:', error);
+                alert('删除记录失败: ' + error.message);
+            }
+        }
+
+        // ==================== 照片管理 ====================
+        async function showPhotoViewer(record) {
+            state.currentRecord = record;
+            document.getElementById('photoViewerTitle').textContent = record.name;
+            document.getElementById('photoViewer').classList.add('active');
+            
+            updateRefreshButtonVisibility();
+            
+            if (!state.useLocalStorage && record.folderHandle) {
+                await refreshPhotosFromFolder(record);
+            }
+            
+            await renderPhotos();
+        }
+
+        function updateRefreshButtonVisibility() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            refreshBtn.style.display = state.useLocalStorage ? 'none' : 'inline-block';
+        }
+
+        function closePhotoViewer() {
+            document.getElementById('photoViewer').classList.remove('active');
+            document.getElementById('refreshBtn').style.display = 'none';
+            state.currentRecord = null;
+        }
+
+        async function refreshPhotos() {
+            if (!state.useLocalStorage && state.currentRecord && state.currentRecord.folderHandle) {
+                await refreshPhotosFromFolder(state.currentRecord);
+                await renderPhotos();
+            }
+        }
+
+        async function refreshPhotosFromFolder(record) {
+            try {
+                const photosHandle = await record.folderHandle.getDirectoryHandle('photos');
+                const photoFiles = [];
+                for await (const photoEntry of photosHandle.values()) {
+                    if (photoEntry.kind === 'file') {
+                        photoFiles.push(photoEntry.name);
+                    }
+                }
+                record.photos = photoFiles;
+                
+                const infoHandle = await record.folderHandle.getFileHandle('info.json', { create: true });
+                const writableInfo = await infoHandle.createWritable();
+                await writableInfo.write(JSON.stringify(record, null, 2));
+                await writableInfo.close();
+            } catch (error) {
+                record.photos = [];
+            }
+        }
+
+        async function renderPhotos() {
+            const photoGrid = document.getElementById('photoGrid');
+            photoGrid.innerHTML = '';
+
+            if (state.currentRecord.photos.length === 0) {
+                photoGrid.innerHTML = '<p style="color: #999; text-align: center; grid-column: 1/-1;">暂无照片</p>';
+                return;
+            }
+
+            for (let i = 0; i < state.currentRecord.photos.length; i++) {
+                const photoItem = await createPhotoItem(i);
+                photoGrid.appendChild(photoItem);
+            }
+        }
+
+        async function createPhotoItem(index) {
+            const photo = state.currentRecord.photos[index];
+            const photoItem = document.createElement('div');
+            photoItem.className = 'photo-item';
+            
+            const img = document.createElement('img');
+            img.src = await getPhotoSrc(photo);
+            img.alt = photo;
+            img.onclick = (e) => {
+                if (!e.target.classList.contains('photo-item-delete')) {
+                    showPhotoModal(img.src);
+                }
+            };
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'photo-item-delete';
+            deleteBtn.innerHTML = '×';
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                deletePhoto(index);
+            };
+            
+            photoItem.appendChild(img);
+            photoItem.appendChild(deleteBtn);
+            return photoItem;
+        }
+
+        async function getPhotoSrc(photo) {
+            if (state.useLocalStorage) {
+                return photo.data;
+            } else {
+                try {
+                    const photosHandle = await state.currentRecord.folderHandle.getDirectoryHandle('photos');
+                    const photoHandle = await photosHandle.getFileHandle(photo);
+                    const photoFile = await photoHandle.getFile();
+                    return URL.createObjectURL(photoFile);
+                } catch (error) {
+                    console.error('加载照片失败:', error);
+                    return 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="#eee" width="100" height="100"/><text fill="#999" x="50%" y="50%" text-anchor="middle" dy=".3em">加载失败</text></svg>');
+                }
+            }
+        }
+
+        async function handlePhotoUpload(event) {
+            const files = Array.from(event.target.files || []).filter(file => file.type.startsWith('image/'));
+            await addPhotoFiles(files);
+            event.target.value = '';
+        }
+
+        async function addPhotoFiles(files) {
+            if (!state.currentRecord || !files.length) return;
+            for (const file of files) {
+                if (state.useLocalStorage) uploadPhotoToLocalStorage(file);
+                else await uploadPhotoToFolder(file);
+            }
+        }
+
+        function setupPhotoDropZone() {
+            const zone = document.getElementById('photoDropZone');
+            if (!zone) return;
+            ['dragenter', 'dragover'].forEach(type => zone.addEventListener(type, event => {
+                event.preventDefault(); event.stopPropagation(); zone.classList.add('drag-over');
+            }));
+            ['dragleave', 'dragend'].forEach(type => zone.addEventListener(type, event => {
+                event.preventDefault(); zone.classList.remove('drag-over');
+            }));
+            zone.addEventListener('drop', async event => {
+                event.preventDefault(); event.stopPropagation(); zone.classList.remove('drag-over');
+                const files = Array.from(event.dataTransfer.files || []);
+                const images = files.filter(file => file.type.startsWith('image/'));
+                if (images.length !== files.length) alert('只支持拖入图片文件。');
+                await addPhotoFiles(images);
+            });
+            zone.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault(); document.getElementById('photoFileInput').click();
+                }
+            });
+        }
+
+        function uploadPhotoToLocalStorage(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const photo = {
+                    name: file.name,
+                    data: e.target.result,
+                    uploadedAt: new Date().toISOString()
+                };
+
+                state.currentRecord.photos.push(photo);
+                updateLocalStorageRecord();
+                renderPhotos();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateLocalStorageRecord() {
+            const recordIndex = state.travelRecords.findIndex(r => r.id === state.currentRecord.id);
+            if (recordIndex !== -1) {
+                state.travelRecords[recordIndex] = state.currentRecord;
+                localStorage.setItem('travelRecords', JSON.stringify(state.travelRecords));
+            }
+        }
+
+        async function uploadPhotoToFolder(file) {
+            try {
+                const photosHandle = await state.currentRecord.folderHandle.getDirectoryHandle('photos');
+                const photoHandle = await photosHandle.getFileHandle(file.name, { create: true });
+                const writable = await photoHandle.createWritable();
+                await writable.write(file);
+                await writable.close();
+                
+                await refreshPhotosFromFolder(state.currentRecord);
+                renderPhotos();
+            } catch (error) {
+                console.error('上传照片失败:', error);
+                alert('上传照片失败: ' + error.message);
+            }
+        }
+
+        async function deletePhoto(index) {
+            if (confirm('确定要删除这张照片吗？')) {
+                const photoName = state.currentRecord.photos[index];
+                state.currentRecord.photos.splice(index, 1);
+                
+                if (state.useLocalStorage) {
+                    updateLocalStorageRecord();
+                } else {
+                    await deletePhotoFromFolder(photoName);
+                }
+                
+                renderPhotos();
+            }
+        }
+
+        async function deletePhotoFromFolder(photoName) {
+            try {
+                const photosHandle = await state.currentRecord.folderHandle.getDirectoryHandle('photos');
+                await photosHandle.removeEntry(photoName);
+                await refreshPhotosFromFolder(state.currentRecord);
+            } catch (error) {
+                console.error('删除照片失败:', error);
+                alert('删除照片失败: ' + error.message);
+            }
+        }
+
+        function showPhotoModal(photoData) {
+            document.getElementById('photoModalImage').src = photoData;
+            document.getElementById('photoModal').classList.add('active');
+        }
+
+        function closePhotoModal() {
+            document.getElementById('photoModal').classList.remove('active');
+        }
+
+        // ==================== 笔记管理 ====================
+        async function openNoteEditor() {
+            if (!state.currentRecord) return;
+            
+            document.getElementById('photoViewer').classList.remove('active');
+            document.getElementById('noteEditorTitle').textContent = `${state.currentRecord.name} - 笔记编辑器`;
+            document.getElementById('noteEditor').classList.add('active');
+            
+            const noteContent = await loadNoteContent();
+            document.getElementById('noteContent').value = noteContent;
+        }
+
+        async function loadNoteContent() {
+            if (!state.useLocalStorage && state.currentRecord.folderHandle) {
+                try {
+                    const noteHandle = await state.currentRecord.folderHandle.getFileHandle('note.txt');
+                    const noteFile = await noteHandle.getFile();
+                    return await noteFile.text();
+                } catch (error) {
+                    return '';
+                }
+            } else {
+                const noteKey = `note_${state.currentRecord.id}`;
+                return localStorage.getItem(noteKey) || '';
+            }
+        }
+
+        function closeNoteEditor() {
+            document.getElementById('noteEditor').classList.remove('active');
+            if (state.currentRecord) {
+                document.getElementById('photoViewer').classList.add('active');
+            }
+        }
+
+        function openColorEditor() {
+            if (!state.currentRecord) return;
+            
+            document.getElementById('photoViewer').classList.remove('active');
+            document.getElementById('colorEditorTitle').textContent = `${state.currentRecord.name} - 修改标记颜色`;
+            document.getElementById('colorEditor').classList.add('active');
+            
+            // 设置当前颜色
+            const currentColor = state.currentRecord.color || '#FF0000';
+            document.getElementById('selectedEditColor').value = currentColor;
+            document.querySelectorAll('#colorEditor .color-option').forEach(opt => opt.classList.remove('selected'));
+            const selectedOption = document.querySelector(`#colorEditor .color-option[data-color="${currentColor}"]`);
+            if (selectedOption) {
+                selectedOption.classList.add('selected');
+            }
+        }
+
+        function closeColorEditor() {
+            document.getElementById('colorEditor').classList.remove('active');
+            if (state.currentRecord) {
+                document.getElementById('photoViewer').classList.add('active');
+            }
+        }
+
+        async function saveColor() {
+            if (!state.currentRecord) return;
+            
+            const newColor = document.getElementById('selectedEditColor').value;
+            state.currentRecord.color = newColor;
+            
+            // 更新地图上的标记
+            updateMarkerColor(state.currentRecord);
+            
+            // 更新存储
+            if (state.useLocalStorage) {
+                updateLocalStorageRecordColor(state.currentRecord.id, newColor);
+            } else {
+                await updateFolderRecordColor(state.currentRecord, newColor);
+            }
+            
+            closeColorEditor();
+            alert('颜色修改成功！');
+        }
+
+        function updateMarkerColor(record) {
+            // 找到对应的标记并更新
+            const markerData = state.markers.find(m => m.record.id === record.id);
+            if (markerData) {
+                // 移除旧标记
+                state.map.removeLayer(markerData.marker);
+                
+                // 创建新标记
+                const color = record.color || '#FF0000';
+                const customIcon = L.divIcon({
+                    className: 'custom-marker',
+                    html: `<svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 8.7 12.5 28.5 12.5 28.5S25 21.2 25 12.5C25 5.6 19.4 0 12.5 0z" fill="${color}" stroke="white" stroke-width="2"/>
+                        <circle cx="12.5" cy="12.5" r="5" fill="white"/>
+                    </svg>`,
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41]
+                });
+
+                const newMarker = L.marker([record.lat, record.lng], { icon: customIcon })
+                    .addTo(state.map)
+                    .bindPopup(`<b>${record.name}</b>`);
+                
+                newMarker.on('click', () => showPhotoViewer(record));
+                
+                // 更新标记数据
+                markerData.marker = newMarker;
+            }
+        }
+
+        function updateLocalStorageRecordColor(recordId, newColor) {
+            const recordIndex = state.travelRecords.findIndex(r => r.id === recordId);
+            if (recordIndex !== -1) {
+                state.travelRecords[recordIndex].color = newColor;
+                localStorage.setItem('travelRecords', JSON.stringify(state.travelRecords));
+            }
+        }
+
+        async function updateFolderRecordColor(record, newColor) {
+            try {
+                await saveRecordToFolder(record.folderHandle, record);
+            } catch (error) {
+                console.error('更新文件夹记录颜色失败:', error);
+                alert('更新颜色失败: ' + error.message);
+            }
+        }
+
+        async function saveNote() {
+            if (!state.currentRecord) return;
+            
+            const noteContent = document.getElementById('noteContent').value;
+            
+            if (!state.useLocalStorage && state.currentRecord.folderHandle) {
+                await saveNoteToFolder(noteContent);
+            } else {
+                saveNoteToLocalStorage(noteContent);
+            }
+            
+            closeNoteEditor();
+        }
+
+        async function saveNoteToFolder(noteContent) {
+            try {
+                const noteHandle = await state.currentRecord.folderHandle.getFileHandle('note.txt', { create: true });
+                const writable = await noteHandle.createWritable();
+                await writable.write(noteContent);
+                await writable.close();
+                alert('笔记保存成功！');
+            } catch (error) {
+                console.error('保存笔记失败:', error);
+                alert('保存笔记失败: ' + error.message);
+            }
+        }
+
+        function saveNoteToLocalStorage(noteContent) {
+            const noteKey = `note_${state.currentRecord.id}`;
+            localStorage.setItem(noteKey, noteContent);
+            alert('笔记保存成功！');
+        }
+
+        // ==================== 数据导入导出 ====================
+        function exportData() {
+            const dataStr = JSON.stringify(state.travelRecords, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `travel_records_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (Array.isArray(importedData)) {
+                        if (confirm('导入将覆盖现有数据，确定要继续吗？')) {
+                            clearCurrentMarkers();
+                            state.travelRecords = importedData;
+                            localStorage.setItem('travelRecords', JSON.stringify(state.travelRecords));
+                            loadRecords();
+                            document.getElementById('firstTimeHelp').style.display = 'none';
+                            alert('数据导入成功！');
+                        }
+                    } else {
+                        alert('无效的数据格式');
+                    }
+                } catch (error) {
+                    alert('导入失败：数据格式错误');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function clearCurrentMarkers() {
+            state.markers.forEach(item => state.map.removeLayer(item.marker));
+            state.markers = [];
+        }
+
+        // ==================== 搜索功能 ====================
+        let searchTimeout = null;
+
+        function handleSearchInput() {
+            const searchInput = document.getElementById('searchInput');
+            const searchResults = document.getElementById('searchResults');
+            const query = searchInput.value.trim();
+
+            // 清除之前的定时器
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+
+            if (query.length < 2) {
+                searchResults.classList.remove('active');
+                return;
+            }
+
+            // 设置防抖延迟
+            searchTimeout = setTimeout(() => {
+                searchLocation(query);
+            }, 500);
+        }
+
+        function handleSearchKeypress(event) {
+            if (event.key === 'Enter') {
+                const searchInput = document.getElementById('searchInput');
+                const query = searchInput.value.trim();
+                if (query.length >= 2) {
+                    if (searchTimeout) {
+                        clearTimeout(searchTimeout);
+                    }
+                    searchLocation(query);
+                }
+            }
+        }
+
+        function searchLocation(query) {
+            const searchResults = document.getElementById('searchResults');
+            searchResults.innerHTML = '<div class="search-result-item">搜索中...</div>';
+            searchResults.classList.add('active');
+
+            // 使用高德地图Web服务API
+            const apiKey = localStorage.getItem("travelmap.amapKey") || "";
+            if (!apiKey) {
+                searchResults.textContent = "请先点击地图设置，填写自己的高德 Web 服务 Key。";
+                openMapSettings();
+                return;
+            }
+            const url = `https://restapi.amap.com/v3/place/text?key=${apiKey}&keywords=${encodeURIComponent(query)}&output=json&city=全国`;
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.status === '1' && data.pois && data.pois.length > 0) {
+                        displayAmapResults(data.pois);
+                    } else {
+                        displayFallbackResults(query);
+                    }
+                })
+                .catch(error => {
+                    console.error('高德API搜索失败:', error);
+                    displayFallbackResults(query);
+                });
+        }
+
+        function displayAmapResults(pois) {
+            const searchResults = document.getElementById('searchResults');
+            searchResults.innerHTML = '';
+
+            pois.slice(0, 5).forEach(poi => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'search-result-item';
+                
+                const name = poi.name;
+                const address = poi.address || (poi.pname || '') + (poi.cityname || '') + (poi.adname || '');
+                
+                // 高德API返回的location格式为 "经度,纬度"
+                const location = poi.location.split(',');
+                const lng = parseFloat(location[0]);
+                const lat = parseFloat(location[1]);
+                
+                resultItem.innerHTML = `
+                    <div class="search-result-name">${name}</div>
+                    <div class="search-result-address">${address}</div>
+                `;
+                
+                resultItem.onclick = () => {
+                    selectSearchResult({
+                        lat: lat,
+                        lon: lng,
+                        display_name: name
+                    });
+                };
+                
+                searchResults.appendChild(resultItem);
+            });
+
+            searchResults.classList.add('active');
+        }
+
+        function displayFallbackResults(query) {
+            const searchResults = document.getElementById('searchResults');
+            
+            // 提供一些常见旅游地点的数据
+            const commonPlaces = [
+                { name: '故宫', lat: 39.9163, lng: 116.3972, address: '北京市东城区景山前街4号' },
+                { name: '天安门', lat: 39.9054, lng: 116.3976, address: '北京市东城区长安街' },
+                { name: '长城', lat: 40.4319, lng: 116.5704, address: '北京市延庆区八达岭长城' },
+                { name: '天坛', lat: 39.8822, lng: 116.4066, address: '北京市东城区天坛东路' },
+                { name: '颐和园', lat: 39.9999, lng: 116.2755, address: '北京市海淀区新建宫门路' },
+                { name: '西湖', lat: 30.2477, lng: 120.1459, address: '浙江省杭州市西湖区' },
+                { name: '外滩', lat: 31.2397, lng: 121.4908, address: '上海市黄浦区中山东一路' },
+                { name: '兵马俑', lat: 34.3848, lng: 109.2785, address: '陕西省西安市临潼区' },
+                { name: '泰山', lat: 36.2557, lng: 117.1011, address: '山东省泰安市泰山区' },
+                { name: '黄山', lat: 30.1319, lng: 118.1666, address: '安徽省黄山市黄山区' },
+                { name: '九寨沟', lat: 33.1599, lng: 103.9148, address: '四川省阿坝藏族羌族自治州九寨沟县' },
+                { name: '张家界', lat: 29.1251, lng: 110.4792, address: '湖南省张家界市武陵源区' },
+                { name: '布达拉宫', lat: 29.6576, lng: 91.1170, address: '西藏自治区拉萨市城关区' },
+                { name: '三亚湾', lat: 18.2524, lng: 109.5119, address: '海南省三亚市天涯区' },
+                { name: '鼓浪屿', lat: 24.4463, lng: 118.0657, address: '福建省厦门市思明区' }
+            ];
+
+            const filtered = commonPlaces.filter(place => 
+                place.name.includes(query) || place.address.includes(query)
+            );
+
+            if (filtered.length > 0) {
+                searchResults.innerHTML = '';
+                filtered.forEach(place => {
+                    const resultItem = document.createElement('div');
+                    resultItem.className = 'search-result-item';
+                    
+                    resultItem.innerHTML = `
+                        <div class="search-result-name">${place.name}</div>
+                        <div class="search-result-address">${place.address}</div>
+                    `;
+                    
+                    resultItem.onclick = () => {
+                        selectSearchResult({
+                            lat: place.lat,
+                            lng: place.lng,
+                            display_name: place.name
+                        });
+                    };
+                    
+                    searchResults.appendChild(resultItem);
+                });
+                searchResults.classList.add('active');
+            } else {
+                searchResults.innerHTML = '<div class="search-result-item">未找到相关地点 (目前使用内置数据，可配置高德API)</div>';
+                searchResults.classList.add('active');
+            }
+        }
+
+        function selectSearchResult(result) {
+            const searchResults = document.getElementById('searchResults');
+            const searchInput = document.getElementById('searchInput');
+            
+            // 隐藏搜索结果
+            searchResults.classList.remove('active');
+            searchInput.value = result.display_name;
+
+            // 移除之前的搜索标记
+            if (state.searchMarker) {
+                state.map.removeLayer(state.searchMarker);
+            }
+
+            // 创建新的搜索标记
+            const lat = parseFloat(result.lat);
+            const lng = parseFloat(result.lon || result.lng); // 兼容不同的字段名
+            
+            state.searchMarker = L.marker([lat, lng], {
+                icon: L.divIcon({
+                    className: 'search-marker',
+                    html: `<svg width="25" height="41" viewBox="0 0 25 41" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12.5 0C5.6 0 0 5.6 0 12.5c0 8.7 12.5 28.5 12.5 28.5S25 21.2 25 12.5C25 5.6 19.4 0 12.5 0z" fill="#2196F3" stroke="white" stroke-width="2"/>
+                        <circle cx="12.5" cy="12.5" r="5" fill="white"/>
+                    </svg>`,
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41]
+                })
+            }).addTo(state.map);
+
+            // 定位到搜索结果
+            state.map.setView([lat, lng], 15);
+
+            // 5秒后移除搜索标记
+            setTimeout(() => {
+                if (state.searchMarker) {
+                    state.map.removeLayer(state.searchMarker);
+                    state.searchMarker = null;
+                }
+            }, 5000);
+        }
+
+        // 点击页面其他地方隐藏搜索结果
+        document.addEventListener('click', (e) => {
+            const searchContainer = document.querySelector('.search-container');
+            if (searchContainer && !searchContainer.contains(e.target)) {
+                document.getElementById('searchResults').classList.remove('active');
+            }
+        });
+
+        // ==================== 初始化 ====================
+        function init() {
+            state.travelRecords = JSON.parse(localStorage.getItem('travelRecords') || '[]');
+            initMap();
+            loadRecords();
+            autoLoadLastFolder();
+        }
+
+        window.onload = () => { setupPhotoDropZone(); init(); };
+    </script>
+</body>
+</html>

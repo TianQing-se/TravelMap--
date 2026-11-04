@@ -1,0 +1,38 @@
+{
+  "name": "travelmap-desktop",
+  "version": "1.0.0",
+  "description": "Personal travel journal map",
+  "license": "MIT",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --config.electronDist=node_modules/electron/dist"
+  },
+  "build": {
+    "appId": "org.travelmap.desktop",
+    "productName": "TravelMap",
+    "files": [
+      "desktop/**/*",
+      "TravelMap.ico"
+    ],
+    "win": {
+      "icon": "TravelMap.ico",
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "allowToChangeInstallationDirectory": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "TravelMap"
+    },
+    "directories": {
+      "output": "dist"
+    }
+  },
+  "devDependencies": {
+    "electron": "^45.2.1",
+    "electron-builder": "^26.18.0"
+  }
+}
