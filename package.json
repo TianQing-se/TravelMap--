@@ -1,6 +1,6 @@
 {
   "name": "travelmap-desktop",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Personal travel journal map",
   "license": "MIT",
   "main": "desktop/main.cjs",
