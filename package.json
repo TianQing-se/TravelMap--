@@ -1,12 +1,12 @@
 {
   "name": "travelmap-desktop",
-  "version": "1.0.2",
+  "version": "1.0.0",
   "description": "Personal travel journal map",
   "license": "MIT",
   "main": "desktop/main.cjs",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win nsis"
+    "dist": "electron-builder --win nsis --config.electronDist=node_modules/electron/dist"
   },
   "build": {
     "appId": "org.travelmap.desktop",
@@ -17,13 +17,7 @@
     ],
     "win": {
       "icon": "TravelMap.ico",
-      "target": [
-        {
-          "target": "nsis",
-          "arch": ["x64"]
-        }
-      ],
-      "artifactName": "TravelMap-Setup-${version}-${arch}.${ext}"
+      "target": "nsis"
     },
     "nsis": {
       "oneClick": false,
