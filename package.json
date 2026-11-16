@@ -1,6 +1,6 @@
 {
   "name": "travelmap-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Personal travel journal map",
   "license": "MIT",
   "main": "desktop/main.cjs",
@@ -17,7 +17,13 @@
     ],
     "win": {
       "icon": "TravelMap.ico",
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "TravelMap-Setup-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
